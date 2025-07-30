@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Image Grid PDF (2x4 per page)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --primary-color: #4361ee;
+      --secondary-color: #3f37c9;
+      --danger-color: #f72585;
+      --light-bg: #f8f9fa;
+      --card-bg: #ffffff;
+    }
+    
+    body {
+      background: var(--light-bg);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      min-height: 100vh;
+      padding-bottom: 40px;
+    }
+    
+    .main-container {
+      max-width: 800px;
+      margin: 30px auto;
+      background: var(--card-bg);
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      overflow: hidden;
+      border: none;
+    }
+    
+    .header {
+      background: var(--primary-color);
+      color: white;
+      padding: 20px;
+      text-align: center;
+      margin-bottom: 25px;
+    }
+    
+    .header h3 {
+      margin: 0;
+      font-weight: 600;
+      font-size: 1.5rem;
+    }
+    
+    .content-area {
+      padding: 0 25px 25px;
+    }
+    
+    #imagePreview {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 15px;
+      margin: 25px 0;
+    }
+    
+    .preview-img {
+      height: 120px;
+      width: 100%;
+      object-fit: cover;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      transition: all 0.3s ease;
+      cursor: pointer;
+      position: relative;
+    }
+    
+    .preview-img:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .preview-img::after {
+      content: '×';
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background: var(--danger-color);
+      color: white;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    
+    .preview-img:hover::after {
+      opacity: 1;
+    }
+    
+    .btn-primary {
+      background-color: var(--primary-color);
+      border: none;
+      padding: 10px 20px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    
+    .btn-primary:hover {
+      background-color: var(--secondary-color);
+      transform: translateY(-2px);
+    }
+    
+    .btn-danger {
+      background-color: var(--danger-color);
+      border: none;
+      padding: 10px 20px;
+      transition: all 0.2s;
+    }
+    
+    .btn-danger:hover {
+      transform: translateY(-2px);
+    }
+    
+    .upload-area {
+      border: 2px dashed #ddd;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      margin-bottom: 20px;
+      transition: all 0.3s;
+      cursor: pointer;
+    }
+    
+    .upload-area:hover {
+      border-color: var(--primary-color);
+      background: rgba(67, 97, 238, 0.05);
+    }
+    
+    .file-input-label {
+      display: block;
+      cursor: pointer;
+    }
+    
+    .file-input-label i {
+      font-size: 2rem;
+      color: var(--primary-color);
+      margin-bottom: 10px;
+    }
+    
+    .counter-badge {
+      position: absolute;
+      top: -10px;
+      right: -10px;
+      background: var(--danger-color);
+      color: white;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    
+    .action-buttons {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 20px;
+    }
+    
+    .drag-hint {
+      font-size: 0.85rem;
+      color: #666;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+<div class="main-container">
+  <div class="header">
+    <h3><i class="fas fa-images me-2"></i> Image Grid PDF (2×4 per page)</h3>
+  </div>
+  
+  <div class="content-area">
+    <div class="upload-area" onclick="document.getElementById('imageInput').click()">
+      <label class="file-input-label">
+        <i class="fas fa-cloud-upload-alt"></i>
+        <h5>Click to upload images</h5>
+        <p class="text-muted">or drag and drop files here</p>
+        <p class="drag-hint">Supports JPG, PNG, WEBP</p>
+      </label>
+      <input type="file" id="imageInput" class="d-none" accept="image/*" multiple>
+    </div>
+
+    <div id="imagePreview"></div>
+
+    <div class="action-buttons">
+      <button class="btn btn-primary" onclick="generatePDF()">
+        <i class="fas fa-file-pdf me-2"></i>Export to PDF
+      </button>
+      <button class="btn btn-danger" onclick="clearAll()">
+        <i class="fas fa-trash me-2"></i>Clear All
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const { jsPDF } = window.jspdf;
+  let uploadedImages = [];
+
+  // Handle file selection
+  document.getElementById('imageInput').addEventListener('change', function(event) {
+    handleFiles(event.target.files);
+    event.target.value = '';
+  });
+
+  // Handle drag and drop
+  document.addEventListener('DOMContentLoaded', function() {
+    const uploadArea = document.querySelector('.upload-area');
+    
+    uploadArea.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      this.style.borderColor = '#4361ee';
+      this.style.background = 'rgba(67, 97, 238, 0.1)';
+    });
+    
+    uploadArea.addEventListener('dragleave', function(e) {
+      e.preventDefault();
+      this.style.borderColor = '#ddd';
+      this.style.background = '';
+    });
+    
+    uploadArea.addEventListener('drop', function(e) {
+      e.preventDefault();
+      this.style.borderColor = '#ddd';
+      this.style.background = '';
+      if (e.dataTransfer.files.length) {
+        handleFiles(e.dataTransfer.files);
+      }
+    });
+  });
+
+  function handleFiles(files) {
+    const fileList = Array.from(files);
+    if (fileList.length === 0) return;
+    
+    fileList.forEach((file) => {
+      // Check if file is an image
+      if (!file.type.match('image.*')) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        uploadedImages.push(e.target.result);
+        updatePreview();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function updatePreview() {
+    const preview = document.getElementById('imagePreview');
+    preview.innerHTML = '';
+    
+    if (uploadedImages.length === 0) {
+      preview.innerHTML = '<p class="text-muted text-center py-4">No images uploaded yet</p>';
+      return;
+    }
+    
+    uploadedImages.forEach((imgData, index) => {
+      const imgContainer = document.createElement('div');
+      imgContainer.style.position = 'relative';
+      
+      const img = new Image();
+      img.src = imgData;
+      img.className = 'preview-img';
+      img.onclick = () => removeImage(index);
+      
+      const badge = document.createElement('div');
+      badge.className = 'counter-badge';
+      badge.textContent = index + 1;
+      
+      imgContainer.appendChild(img);
+      imgContainer.appendChild(badge);
+      preview.appendChild(imgContainer);
+    });
+  }
+
+  function removeImage(index) {
+    uploadedImages.splice(index, 1);
+    updatePreview();
+  }
+
+  function clearAll() {
+    if (uploadedImages.length === 0) return;
+    if (confirm('Are you sure you want to remove all images?')) {
+      uploadedImages = [];
+      updatePreview();
+    }
+  }
+
+  function generatePDF() {
+    if (uploadedImages.length === 0) {
+      alert('Please upload at least one image.');
+      return;
+    }
+
+    const doc = new jsPDF({ 
+      orientation: 'portrait', 
+      unit: 'mm', 
+      format: 'a4' 
+    });
+
+    const imagesPerPage = 8;
+    const cols = 2;
+    const rows = 4;
+
+    const pageWidth = 210;
+    const pageHeight = 297;
+    const padding = 3;
+
+    const cellWidth = (pageWidth - padding * (cols + 1)) / cols;
+    const cellHeight = (pageHeight - padding * (rows + 1)) / rows;
+
+    uploadedImages.forEach((imgData, index) => {
+      if (index > 0 && index % imagesPerPage === 0) {
+        doc.addPage();
+      }
+
+      const pos = index % imagesPerPage;
+      const row = Math.floor(pos / cols);
+      const col = pos % cols;
+
+      const x = padding + col * (cellWidth + padding);
+      const y = padding + row * (cellHeight + padding);
+
+      doc.addImage(imgData, 'JPEG', x, y, cellWidth, cellHeight);
+    });
+
+    doc.save("PhornXsingTool.pdf");
+  }
+</script>
+</body>
+</html>
